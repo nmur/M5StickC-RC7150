@@ -30,7 +30,42 @@ constexpr Rc5Frame kAlignSequence[] = {
     {31, 4, 1, 0},
 };
 
+void drawUi(bool sending) {
+    const int centerX = M5.Display.width() / 2;
+    const uint16_t statusColor = sending ? TFT_ORANGE : TFT_DARKGREEN;
+
+    M5.Display.startWrite();
+    M5.Display.fillScreen(TFT_BLACK);
+    M5.Display.setTextColor(TFT_LIGHTGREY);
+    M5.Display.setTextSize(1);
+    M5.Display.drawString("RC7150", centerX, 20);
+    M5.Display.setTextColor(TFT_WHITE);
+    M5.Display.setTextSize(3);
+    M5.Display.drawString("ALIGN", centerX, 62);
+    M5.Display.setTextSize(1);
+    M5.Display.drawString("Service mode", centerX, 88);
+
+    M5.Display.fillRoundRect(8, 110, M5.Display.width() - 16, 38, 6, statusColor);
+    M5.Display.setTextColor(sending ? TFT_BLACK : TFT_WHITE);
+    M5.Display.setTextSize(2);
+    M5.Display.drawString(sending ? "SENDING" : "READY", centerX, 129);
+
+    M5.Display.setTextColor(TFT_WHITE);
+    M5.Display.setTextSize(1);
+    M5.Display.drawString(sending ? "Keep aimed" : "Press", centerX, 177);
+    M5.Display.setTextSize(2);
+    M5.Display.drawString(sending ? "AT TV" : "BUTTON A", centerX, 198);
+    if (!sending) {
+        M5.Display.fillTriangle(centerX - 8, 219, centerX + 8, 219,
+                               centerX, 230, TFT_WHITE);
+    }
+    M5.Display.endWrite();
+    M5.Display.waitDisplay();
+}
+
 void sendAlign() {
+    // Finish display transfers before starting the timing-sensitive sequence.
+    drawUi(true);
     digitalWrite(kTxLedPin, LOW);
     for (const auto& frame : kAlignSequence) {
         // The setter prepares an inverted value; sendRC5 must toggle it once.
@@ -46,6 +81,7 @@ void sendAlign() {
         }
     }
     digitalWrite(kTxLedPin, HIGH);
+    drawUi(false);
     Serial.println("Sent ALIGN (5 RC5 frames; toggles=0,0,0,0,1).");
 }
 }  // namespace
@@ -65,10 +101,16 @@ void setup() {
     config.internal_spk = false;
     config.output_power = false;
     M5.begin(config);
-    M5.Display.setBrightness(0);  // No on-device interface in this PoC.
+    M5.Display.setBrightness(0);
+    M5.Display.setRotation(0);  // 135x240 portrait, Button A below the screen.
+    M5.Display.setFont(&lgfx::fonts::Font0);
+    M5.Display.setTextDatum(lgfx::textdatum_t::middle_center);
+    M5.Display.setTextWrap(false);
     M5.BtnA.setDebounceThresh(25);
 
     IrSender.begin();
+    drawUi(false);
+    M5.Display.setBrightness(128);
     Serial.println("M5StickC-RC7150: press Button A to send ALIGN.");
 }
 
